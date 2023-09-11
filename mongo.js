@@ -1,3 +1,7 @@
+/* eslint-disable no-dupe-keys */
+/* eslint-disable linebreak-style */
+/* eslint-disable no-unused-vars */
+/* eslint-disable no-undef */
 const mongoose = require('mongoose')
 
 const password = process.argv[2]
@@ -12,29 +16,29 @@ mongoose.set('strictQuery', false)
 mongoose.connect(url)
 
 const personSchema = new mongoose.Schema({
-  name: String,
-  number: String
+    name: String,
+    number: String
 })
 
 const Person = mongoose.model('Person', personSchema)
 
 const person = new Person({
-  name: name,
-  number: number
+    name: name,
+    number: number
 })
 
 if (process.argv.length === 3) {
-  console.log('Phonebook: ')
-  Person.find({}).then((result) => {
-    result.forEach((person) => {
-      console.log(`${person.name} ${person.number}`)
+    console.log('Phonebook: ')
+    Person.find({}).then((result) => {
+        result.forEach((person) => {
+            console.log(`${person.name} ${person.number}`)
+        })
+        mongoose.connection.close()
+        process.exit(1)
     })
-    mongoose.connection.close()
-    process.exit(1)
-  })
 } else {
-  person.save().then(_result => {
-    console.log(`Added ${person.name} number ${person.number} to phonebook`)
-    mongoose.connection.close()
-  })
+    person.save().then(_result => {
+        console.log(`Added ${person.name} number ${person.number} to phonebook`)
+        mongoose.connection.close()
+    })
 }

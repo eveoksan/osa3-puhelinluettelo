@@ -1,28 +1,19 @@
-const { res } = require('express')
+require('dotenv').config()
 const express = require('express')
 const app = express()
 const morgan = require('morgan')
 const cors = require('cors')
-
-/*
-const requestLogger = (request, response, next) => {
-  console.log('Method:', request.method)
-  console.log('Path:  ', request.path)
-  console.log('Body:  ', request.body)
-  console.log('---')
-  next()
-}
-*/
+const mongoose = require('mongoose')
+const Person = require('./models/person')
 
 app.use(cors())
 app.use(express.json())
 app.use(express.static('build'))
-//app.use(requestLogger)
 
 
 morgan.token('post-data', (req) => {
   if (req.method === 'POST') {
-    return JSON.stringify(req.body);
+    return JSON.stringify(req.body)
   }
 })
 
@@ -52,6 +43,7 @@ let persons = [
   }
 ]
 
+
 app.get('/', (req, res) => {
   res.send('<h1>Phonebook</h1>')
 })
@@ -62,71 +54,96 @@ app.get('/info', (req, res) => {
 })
 
 app.get('/api/persons', (req, res) => {
+  Person.find({}).then(persons => {
     res.json(persons)
+  })
 })
 
-app.get('/api/persons/:id', (req, res) => {
-    const id = Number(req.params.id)
-    const person = persons.find(note => note.id === id)
-
-    if (person) {
-      res.json(person)
-    } else {
-      console.log("article not  found, so 404");
-      res.status(404).end()
-    }
+app.get('/api/persons/:id', (req, res, next) => {
+  Person.findById(req.params.id)
+    .then(person => {
+      if (person) {
+        res.json(person)
+      } else {
+        console.log(error)
+        res.status(404).end()
+      }
+    })
+    .catch(error => next(error))
 })
 
-app.delete('/api/persons/:id', (req, res) => {
-  const id = Number(req.params.id)
-  persons = persons.filter(person => person.id !== id)
 
-  res.status(204).end()
+app.post('/api/persons', (req, res, next) => {
+  const body = req.body
+
+  if(!body.name) {
+    return res.status(400).json({
+      error: 'name is missing'
+    })
+  }
+  if(!body.number) {
+    return res.status(400).json({
+      error: 'number is missing'
+    })
+  }
+
+  if(persons.find(person => person.name === body.name)) {
+    return res.status(400).json({
+      error: 'name must be unique'
+    })
+  }
+
+  const person = new Person({
+    name: body.name,
+    number: body.number
+  })
+
+  person.save().then(savedPerson => {
+    res.json(savedPerson)
+  })
+    .catch((error) => next(error))
 })
 
-app.post('/api/persons', (req, res) => {
-    const body = req.body
 
-    if(!body.name) {
-      return res.status(400).json({ 
-        error: 'name is missing' 
-      })
-    }
-
-    if(!body.number) {
-      return res.status(400).json({ 
-        error: 'number is missing' 
-      })
-    }
-
-    if(persons.find(person => person.name === body.name)) {
-      return res.status(400).json({
-        error: 'name must be unique'
-      })
-    }
-
-    const person = {
-      name: body.name,
-      id: generateId(),
-      number: body.number
-    }
-    
-    persons.concat(person)
-    res.json(person)
+app.delete('/api/persons/:id', (req, res, next) => {
+  Person.findByIdAndRemove(req.params.id)
+    .then(result => {
+      res.status(204).end()
+    })
+    .catch(error => next(error))
 })
 
-const generateId = () => {
-  return Math.floor(Math.random() * 10000)
+
+app.put('/api/persons/:id', (req, res, next) => {
+  const person = {
+    name: req.body.name,
+    number: req.body.number,
+  }
+  Person.findByIdAndUpdate(req.params.id, person, { new:true })
+    .then((updatedPerson) => {
+      res.json(updatedPerson.toJSON())
+    })
+    .catch((error) => next(error))
+})
+
+
+const unknownEndpoint = (req, res) => {
+  res.status(404).send({ error: 'unknown endpoint' })
 }
+app.use(unknownEndpoint)
 
-  
-/*
-const unknownEndpoint = (request, response) => {
-  console.log("tässä häiriö")
-  response.status(404).send({ error: 'unknown endpoint' })
+
+const errorHandler = (error, req, res, next) => {
+  console.error(error.message)
+  if (error.name === 'CastError') {
+    return res.status(400).send({ error: 'malformatted id' })
+  } else if (error.name === 'ValidationError') {
+    return res.status(400).json({ error: error.message })
+  }
+  next(error)
 }
- app.use(unknownEndpoint)
-*/
+app.use(errorHandler)
+
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
